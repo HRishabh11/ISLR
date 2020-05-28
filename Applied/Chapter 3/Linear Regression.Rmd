@@ -1,0 +1,503 @@
+---
+title: "Linear Regression"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(warning = FALSE)
+knitr::opts_chunk$set(tidy = TRUE)
+knitr::opts_chunk$set(strip.white = TRUE)
+```
+
+```{r, include = FALSE}
+# Loading required packages
+library(ggplot2)
+library(dplyr)
+library(kableExtra)
+library(car)
+library(ISLR)
+library(GGally)
+```
+
+\tableofcontents
+\newpage
+
+# 3.7.8 #
+Loading the required data
+
+```{r}
+data1 <- Auto
+data1$cylinders <- as.factor(data1$cylinders)
+data1$origin <- as.factor(data1$origin)
+data1$name <- as.character(data1$name)
+kable(head(data1, 10))
+```
+## (a) ##
+```{r}
+ggplot(data1, aes(x = horsepower, y = mpg, color = year, size = cylinders))+
+  geom_point(alpha = 0.5)
+```
+We see that there is some sort of linear relatin between horsepower and mpg. We may however need to transform the variables in order to make the relationship more linear.\
+
+\textbf{Linear Model of mpg and horsepower}
+```{r}
+l1 <- lm(mpg ~ horsepower, data = data1)
+summary(l1)
+```
+
+\textbf{Prediction for horse power with prediction interval}
+```{r}
+predict(l1, newdata = data.frame(horsepower = c(98)), interval = 'prediction')
+```
+
+\textbf{Prediction for horse power with confidence interval}
+```{r}
+predict(l1, newdata = data.frame(horsepower = c(98)), interval = 'confidence')
+```
+*Comments:*/
+1. There is a relationship between mpg and horsepower.\
+2. The relationship is very statistically significant.\
+3. The relationship is negative.\
+4. The predicted mpg for a horsepower of 98 is 24.47. The 95% Prediction Interval is (14.81,34,12) and 95% Confidence Interval is (23.97, 24.96).\
+
+## (b) ##
+```{r}
+ggplot(data = data1, aes(x = horsepower, y = mpg)) +
+  geom_point(alpha = 0.5,aes(color = year, size = cylinders)) +
+  geom_smooth(method = lm, color = 'black')
+```
+
+## (c) ##
+\textbf{Diagnostic Plots}
+```{r}
+par(mfrow = c(2,2))
+plot(l1)
+```
+*Comments:*\
+1. The Residuals vs. Fitted Values plot shows that there might be non linear pattern in the residuals.\
+2. The Residuals vs Leverage plot shows that there are some bad leverage points that we might have to check.\
+
+# 3.7.9 #
+We will be using the same dataset as above.
+## (a) ##
+\textbf{Scatterplots for the data}
+```{r,fig.width=10,fig.height=10}
+ggpairs(data1[-c(9)],progress = FALSE)
+```
+
+
+## (b) ##
+\textbf{Correlation plot}
+
+```{r}
+corr <- cor(data1[-c(2,8,9)])
+ggcorrplot::ggcorrplot(corr, lab = T)
+```
+
+## (c) ##
+\textbf{Multiple Linear Regression Model}
+```{r}
+l2 <- lm(mpg ~ ., data = data1[-c(9)])
+summary(l2)
+```
+*Comments:*\
+1. Yes, thre is a relationship between the response and predictors.\
+2. Except cylinders6 and acceleration, all the other predictors are statistically significant.\
+3. A unit increase in the year of the car increases the mpg by 0.737 units on average, keeping everything else constant.\
+
+## (d) ##
+\textbf{Diagnostic plots}
+```{r}
+par(mfrow = c(2,2))
+plot(l2)
+```
+
+*Comments:*\
+1. Looking at the Residuals vs Fitted Values plot, we still see slight nonlinearity.\
+2. There are some bad leverage points like observation 328, 394, 275.\
+3. There are some problems at the upper end of the Q-Q plot. This might also be due to the leverage points.\
+
+## (e) ##
+\textbf{Regression Model with interaction terms}
+
+```{r}
+l3 <- lm(mpg ~ . + cylinders:horsepower + displacement:weight + year:origin, data = data1[-c(9)])
+summary(l3)
+```
+Among the interaction terms, the interaction between displacement and weight, year and origin2 and cylinders5 and horsepower are statistically significant. The others can be excluded.
+
+
+# 3.7.10 #
+We will be using the Carseats data.
+
+```{r}
+data2 <- Carseats
+kable(head(data2,10))
+```
+
+## (a) ##
+\textbf{Multiple Linear Regression to fit Sales with Price, Urban, US}
+
+```{r}
+l4 <- lm(Sales ~ Price + Urban + US, data = data2)
+summary(l4)
+```
+## (b) ##
+*Price*: A unit increase in price of the carseats decreases the Sales by -0.054 units on average, all else constant.\
+*Urban*: An urban store has a sale 0f 0.022 lower than a non-urban store on average, all else constant.\
+*US*: A US store has a sale of 1.3 higher than a non-US store on average, all else constant.\
+
+## (c) ##
+Mathematically, the model is:\
+\begin{center}
+${Sales = \beta_{0} + \beta_{1} Price + \beta_{2} UrbanYes + \beta_{3} USYes}$
+\end{center}
+
+## (d) ##
+We can reject the null hypothesis of ${H_{0}: \beta_{j} = 0}$ for UrbanYes Variable. The p-value is higher so we faile to reject the null and hence the variable is not statistically significant.
+
+## (e) ##
+\textbf{Reduced Model}
+```{r}
+l5 <- lm(Sales ~ Price + US, data = data2)
+summary(l5)
+```
+
+## (f) ##
+The model are not a very good fit to the data, as the R-squared statistics is very low(around 0.23). We will also check the RSE below.
+
+```{r}
+summary(l5)$sigma
+```
+
+From the RSE, we see that ther model is not a perfect fit.
+
+
+## (g) ##
+\textbf{Confidence Interval for coefficients.}
+```{r}
+confint(l5)
+```
+
+The above output gives the confidence Interval.
+
+## (h) ##
+\textbf{Diagnostic Plots}
+```{r}
+par(mfrow = c(2,2))
+plot(l5)
+```
+
+Yes, there are some points which might have high leverage points. Namely, 26, 368, 377, 69 and 51. We must check these observations.
+
+# 3.7.11 #
+We will be generating our own dataset in this section.
+
+## Generating the dataset ##
+```{r}
+set.seed(1)
+x <- rnorm(100)
+y <- 2*x + rnorm(100)
+data3 <- data.frame(y,x)
+kable(head(data3, 10))
+```
+
+## (a) ##
+\textbf{Linear Regression y onto x without an intercept}
+```{r}
+l6 <- lm(y ~ x + 0)
+summary(l6)
+```
+
+We can see the coeff. estimate, std. error, t-value and p-value in the summary above. We see that the coeff x is statistically significant.
+
+## (b) ##
+\textbf{Linear Regression x onto y without intercept}
+```{r}
+l7 <- lm(x ~ y + 0)
+summary(l7)
+```
+
+We can see the coeff. estimate, std. error, t-value and p-value in the summary above. We see that the coeff y is statistically significant.
+
+## (c) ##
+In both the above regression models, the R-squared value is the same. That means these to variables explain the same amount of variation found in the data.
+
+## (d) ##
+```{r}
+t <- sqrt(length(x) - 1) * sum(x*y) / sqrt(sum(x^2)*sum(y^2) - (sum(x*y))^2)
+print(paste0('T-statistic: ',t))
+```
+
+Hence, the given formula gives the T-statistic.
+
+## (e) ##
+Yes, the test statistic is the same. Changing the order of regression changes the definition of x and y in the formula, but the result obtained is the same.
+
+## (f) ##
+\textbf{Regression of y onto x with intercept}
+```{r}
+l8 <- lm(y ~ x)
+summary(l8)
+```
+
+\textbf{Regression of x onto y}
+```{r}
+l9 <- lm(x ~ y)
+summary(l9)
+```
+
+As we can see, the test statistic is the same.
+
+# 3.7.13 #
+In this section, we will be simulating the dataset.
+
+## (a) ##
+```{r}
+set.seed(1)
+x <- rnorm(100)
+head(x,5)
+```
+
+## (b) ##
+```{r}
+eps <- rnorm(100,0,0.25)
+head(eps,5)
+```
+
+
+## (c) ##
+```{r}
+Y <- -1 + 0.5*x + eps
+head(Y,5)
+```
+
+The length of the vector Y is 100. The ${\beta_{0} = -1}$ and ${\beta_{1} = 0.5}$
+
+
+## (d) ##
+```{r}
+ggplot(data = data.frame(x,Y),aes(x = x, y = Y))+
+  geom_point()
+```
+ There is a linear relationship between x and Y.
+ 
+## (e) ##
+\textbf{Creating the Linear Model}
+```{r}
+l10 <- lm(Y~x)
+summary(l10)
+```
+Here, ${\hat\beta_{0} = -1.0092}$ and ${\hat\beta_{1} = 0.49973}$.\
+
+The estimated coefficient is nearly equal to the actual coefficients.
+
+## (f) ##
+```{r}
+ggplot(data = data.frame(x,Y),aes(x = x, y = Y))+
+  geom_point() +
+  geom_smooth(method = lm, se = F)
+```
+
+## (g) ##
+```{r}
+l11 <- lm(Y ~ x + I(x^2))
+summary(l11)
+```
+
+There is no evidence that the polynomial model improves the model because the ${x^{2}}$ variable is not statistically significant.
+
+## (h) ##
+```{r}
+set.seed(1)
+x1 <- rnorm(100)
+eps1 <- rnorm(100,0,0.005)
+Y1 <- -1 + 0.5*x1 + eps1
+head(data.frame(Y1,x1),5)
+```
+
+The length of the vector Y is 100. The ${\beta_{0} = -1}$ and ${\beta_{1} = 0.5}$
+
+\textbf{Creating the Linear Model}
+```{r}
+l12 <- lm(Y1~x1)
+summary(l12)
+```
+Here, ${\hat\beta_{0} = -1.0001885}$ and ${\hat\beta_{1} = 0.4999947}$.\
+
+The estimated coefficient is nearly equal to the actual coefficients.
+
+```{r}
+ggplot(data = data.frame(x1,Y1),aes(x = x1, y = Y1))+
+  geom_point() +
+  geom_smooth(method = lm, se = F)
+```
+
+\textbf{Creating the polynomial Model}
+```{r}
+l13 <- lm(Y1 ~ x1 + I(x1^2))
+summary(l11)
+```
+
+There is no evidence that the polynomial model improves the model because the ${x^{2}}$ variable is not statistically significant.
+
+## {i} ##
+```{r}
+set.seed(1)
+x2 <- rnorm(100)
+eps2 <- rnorm(100,0,0.5)
+Y2 <- -1 + 0.5*x2 + eps2
+head(data.frame(Y2,x2),5)
+```
+
+The length of the vector Y2 is 100. The ${\beta_{0} = -1}$ and ${\beta_{1} = 0.5}$
+
+\textbf{Creating the Linear Model}
+```{r}
+l14 <- lm(Y2~x2)
+summary(l14)
+```
+Here, ${\hat\beta_{0} = -1.01885}$ and ${\hat\beta_{1} = 0.49947}$.\
+
+The estimated coefficient is nearly equal to the actual coefficients.
+
+```{r}
+ggplot(data = data.frame(x2,Y2),aes(x = x2, y = Y2))+
+  geom_point() +
+  geom_smooth(method = lm, se = F)
+```
+
+\textbf{Creating the polynomial Model}
+```{r}
+l15<- lm(Y2 ~ x2 + I(x2^2))
+summary(l15)
+```
+
+There is no evidence that the polynomial model improves the model because the ${x^{2}}$ variable is not statistically significant.
+
+
+## (j) ##
+\textbf{confidence interval for original data}
+```{r}
+confint(l10)
+```
+
+\textbf{confidence interval for noisier data}
+```{r}
+confint(l14)
+```
+
+\textbf{confidence interval for less noisier data}
+```{r}
+confint(l12)
+```
+
+The lower the noise, the smaller the confidence interval.\
+
+# 3.7.14 #
+## (a) ##
+```{r}
+x1 <- runif(100)
+x2 <- 0.5*x1 + rnorm(100)/10
+y <- 2 + 2*x1 + 0.3*x2 + rnorm(100)
+```
+The true form of the linear model is:\
+
+\begin{center}
+${y = \beta_{0} + \beta_{1} x_{1} + \beta_{2} x_{2}}$
+\end{center}
+
+The true regression coeffiecients are:\
+1. ${\beta_{0} = 2}$\
+2. ${\beta_{1} = 2}$\
+3. ${\beta_{2} = 0.3}$\
+
+## (b) ##
+```{r}
+print(paste0('correlation between x1 and x2 ',round(cor(x1,x2),4)))
+```
+ ${x_{1}}$ and ${x_{2}}$ have highly positive correlation.
+
+```{r}
+ggplot(data.frame(x1,x2), aes(x = x1, y = x2))+
+  geom_point()
+```
+
+
+## (c) ##
+\textbf{Linear Model}
+```{r}
+l16 <- lm(y ~ x1 + x2)
+summary(l16)
+```
+
+The variable x2 is not statistically significant. We can reject the null hypothers ${H_{0}: \beta_{0} = 0}$ but not the other one.
+
+## (d) ##
+Linear Model using only x1.
+
+```{r}
+l17 <- lm(y ~ x1)
+summary(l17)
+```
+Yes we can reject the null hypothesis.
+
+## (e) ##
+Linear Model using only x2.
+
+```{r}
+l18 <- lm(y ~ x2)
+summary(l18)
+```
+
+Yes, we can reject the null hypothesis.
+
+## (f) ##
+Yes, the results in (c) - (e) contradicts each other. As we see, in (c) we showed that x2 was not significant but in (e) we see that it is significant.
+
+## (g) ##
+```{r}
+x1 <- c(x1,0.1)
+x2 <- c(x2, 0.8)
+y <- c(y,6)
+
+l19 <- lm(y ~ x1 + x2)
+summary(l19)
+```
+
+The variable x1 is not statistically significant. We can reject the null hypothers ${H_{0}: \beta_{1} = 0}$ but not the other one.
+
+## (d) ##
+Linear Model using only x1.
+
+```{r}
+l20 <- lm(y ~ x1)
+summary(l20)
+```
+Yes we can reject the null hypothesis.
+
+## (e) ##
+Linear Model using only x2.
+
+```{r}
+l21 <- lm(y ~ x2)
+summary(l21)
+```
+
+Yes, we can reject the null hypothesis.
+
+The result are the same as in previous question. There is a contradiction.
+
+```{r}
+par(mfrow = c(2,2))
+plot(l19)
+```
+
+
+Yes, it seems that the point is a outlier and a bad leverage point.
+
+
+
+
+ 
