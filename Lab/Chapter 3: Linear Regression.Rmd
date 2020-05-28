@@ -1,0 +1,286 @@
+---
+title: 'Lab: Linear Regression'
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+\tableofcontents
+\newpage
+\section{3.6.1 Libraries}
+We load the MASS and ISLR package
+
+```{r}
+library(MASS)
+library(ISLR)
+library(kableExtra)
+```
+\section{3.6.2 Simple Linear Regression}
+We will be using the Boston Dataset from the MASS package.
+
+```{r}
+data <- Boston
+kableExtra::kable(head(data), digits = 3)
+```
+## Description of Variables ##
+
+crim: per capita crime rate by town.\
+zn: proportion of residential land zoned for lots over 25,000 sq.ft.\
+indus: proportion of non-retail business acres per town.\
+chas: Charles River dummy variable (= 1 if tract bounds river; 0 otherwise).\
+nox: nitrogen oxides concentration (parts per 10 million).\
+rm: average number of rooms per dwelling.\
+age: proportion of owner-occupied units built prior to 1940.\
+dis: weighted mean of distances to five Boston employment centres.\
+rad: index of accessibility to radial highways.\
+tax: full-value property-tax rate per $10,000.\
+ptratio: pupil-teacher ratio by town.\
+black: 1000(Bk - 0.63)^2 where Bk is the proportion of blacks by town.\
+lstat: lower status of the population (percent).\
+medv: median value of owner-occupied homes in $1000s.\
+
+## Fitting a Simple Linear Regression Model ##
+```{r}
+lm.fit <- lm(medv ~ lstat, data = data)
+summary(lm.fit)
+```
+
+
+## check information contained in lm.fit object ##
+```{r}
+names(lm.fit)
+```
+
+## extracting the quantities ##
+
+Here we extract the coefficients of the regression model.
+```{r}
+coef(lm.fit)
+```
+
+## Finding the confidence interval ##
+```{r}
+confint(lm.fit)
+```
+
+
+## Predict Function ##
+The predict function is used to predict the dependent values using the regression model. It also gives the confidence or the prediction interval.
+
+*Prediction with Confidence Interval*
+```{r}
+predict(lm.fit, data.frame(lstat = c(5,10,15)), interval = 'confidence')
+```
+
+*Prediction with Prediction Interval*
+```{r}
+predict(lm.fit, data.frame(lstat = c(5,10,15)), interval = 'prediction')
+```
+
+As we can see, the prediction interval is larger than the confidence interval. This is due to prediction interval containing the uncertainity associated with the irreducible error.
+
+## Plotting the results ##
+```{r}
+plot(data$lstat,data$medv, xlab = 'lstat', ylab = 'medv', main = 'medv vs. lstat', pch =18)
+abline(lm.fit,lwd = 3, col = 'red')
+```
+
+
+## Diagnostics Plot ##
+```{r}
+par(mfrow = c(2,2))
+plot(lm.fit)
+```
+
+*Remarks*\
+1. The Residuals vs Fitted Values plot shows some pattern. Thus, the residuals are not randomly distributed.\
+2. The Q-Q plot also has some problems towards the ends.\
+3. The Residuals vs. Leverage plot shows the presence of bad leverage points. We will have to check the data points 215, 413 and 375.\
+
+## Residuals vs Fitted Values ##
+```{r}
+library(ggplot2)
+ggplot(data = data.frame(fit = predict(lm.fit), residuals = residuals(lm.fit)),
+                aes(x = fit,y = residuals)) +
+  geom_point() +
+  xlab("Fitted Values") +
+  ylab("Residuals") +
+  ggtitle("Residuals vs. Fitted Values")
+```
+
+
+## Standardized Residuals vs Fitted Values ##
+```{r}
+ggplot(data = data.frame(fit = predict(lm.fit), residuals = rstudent(lm.fit)),
+                aes(x = fit,y = residuals)) +
+  geom_point() +
+  xlab("Fitted Values") +
+  ylab("Standardized Residuals") +
+  ggtitle("Standardized Residuals vs. Fitted Values")
+```
+
+
+## Calculating hatvalues ##
+```{r}
+plot(hatvalues(lm.fit), xlab = 'Data Point', ylab = 'Leverage')
+which.max(hatvalues(lm.fit))
+```
+\section{3.6.3 Multiple Linear Regression}
+
+## Fiting A Multiple Linear Regression with lstat and age as predictors ##
+```{r}
+lm.fit = lm(medv ~ lstat + age, data = data)
+summary(lm.fit)
+```
+
+## Fitting the Full model with all of the predictors ##
+```{r}
+lm.fit <- lm(medv ~ ., data = data)
+summary(lm.fit)
+```
+From the above summaey we see that indus and age has high p-value. Hence, they are not statistically significant.
+
+## Extracting the components of the summary of the linear model ##
+
+```{r}
+#saving the summary into another object
+sum <- summary(lm.fit)
+```
+## Extrating R-squared ##
+```{r}
+sum$r.squared
+```
+
+## Extracting RSE ##
+```{r}
+sum$sigma
+```
+
+## all the available information in the summary object ##
+```{r}
+names(sum)
+```
+
+## Variance Inflation Factor(VIF) ##
+The library Car has a function to get the VIF.
+
+```{r}
+library(car)
+vif(lm.fit)
+```
+
+tax has a VIF greater than 5. This means that multicollinearity is affecting the model. 
+
+```{r}
+lm.fit1 <- lm(medv~. - age-indus, data = data)
+summary(lm.fit1)
+```
+
+```{r}
+vif(lm.fit1)
+```
+
+Still tax has a high VIF. We will need to perform variable selection on this model.
+
+\section{3.6.4 Interaction Terms}
+In this section, we will see how to add interaction terms.
+
+```{r}
+lm.fit2 <- lm(medv ~ lstat*age, data = data)
+# lstat*age adds three variables to the model. lstat + age + lstat*age
+# lstat:age addas only lstat*age
+summary(lm.fit2)
+```
+
+\section{3.6.5 Non-linear Transformation of the Predictors}
+
+The lm function can also be used to add non-linear transformations of the predictor variables.
+```{r}
+lm.fit3 <- lm(medv ~ lstat + I(lstat^2), data = data)
+summary(lm.fit3)
+```
+
+From the summary, we see that this model is valid. Now, we will perform ANOVA.
+
+## ANOVA ##
+```{r}
+#reduced model
+lm.fit4 <- lm(medv ~ lstat, data = data)
+anova(lm.fit4,lm.fit3)
+```
+Thus, we reject the null hypothesis that both model perform equally well.
+
+## Diagnostic Plots ##
+```{r}
+par(mfrow = c(2,2))
+plot(lm.fit3)
+```
+
+*Remarks*\
+1. The Residuals vs Fitted values is better than our previous models. Now there is no apparant pattern in the residuals.\
+2. The Q-Q plot is similar to before.\
+
+## Adding polynomial terms to the data ##
+Use the poly(var, degree) syntax in lm to add polynomial terms in the model.
+
+```{r}
+lm.fit5 <- lm(medv ~ poly(lstat,5),data = data)
+summary(lm.fit5)
+```
+
+```{r}
+lm.fit6 <- lm(medv ~ poly(lstat,6),data = data)
+summary(lm.fit6)
+```
+So it seems adding more terms than 5 order term is not useful.
+
+## log transformation ##
+In this section we will use log transformation.
+
+```{r}
+lm.fit7 <- lm(medv ~ log(lstat), data = data)
+summary(lm.fit7)
+```
+
+\section{3.6.6 Qualitative Predictors}
+Loading the data called carseats
+```{r}
+data1 <- Carseats
+kable(head(data1))
+```
+
+
+As we can see, from the above table ShelveLoc, Urban, US are qualitative variables.
+
+## Regression Model ##
+```{r}
+lm.fit <- lm(Sales ~ . + Income:Advertising + Price:Age, data = data1)
+summary(lm.fit)
+```
+
+A lot of the variables are not significant, thus we need to perform variable selection in order to determine the correct model.
+
+```{r}
+contrasts(data1$ShelveLoc)
+```
+
+The above function gives the coding for the dummy variable ShelveLoc. We can find similar encoding for other categorical variables.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

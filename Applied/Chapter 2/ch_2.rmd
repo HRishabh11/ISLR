@@ -1,0 +1,171 @@
+---
+title: "ch_2"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+# Problem 8 #
+```{r}
+college = read.csv("College.csv")
+rownames(college) <- college[,1]
+```
+
+```{r}
+college <- college[,-1]
+```
+
+```{r}
+summary(college)
+```
+```{r}
+pairs(college[,1:10])
+```
+
+```{r}
+boxplot(college$Outstate~college$Private)
+```
+
+```{r}
+Elite = rep("No",nrow(college))
+Elite[college$Top10perc > 50] = "Yes"
+college = data.frame(college,Elite)
+summary(college)
+```
+
+```{r}
+boxplot(college$Outstate~college$Elite)
+```
+
+```{r}
+par(mfrow = c(2,2))
+hist(college$Outstate,col = 'red')
+hist(college$F.Undergrad,col = 'blue')
+hist(college$Accept,col = 'black')
+hist(college$Room.Board)
+```
+
+```{r}
+par(mfrow = c(2,2))
+hist(college$Expend)
+hist(college$Apps)
+hist(college$Top10perc)
+hist(college$Top25perc)
+```
+
+
+# Problem 9 #
+```{r}
+auto <- read.csv("Auto.csv")
+library(dplyr)
+glimpse(auto)
+```
+
+```{r}
+cat("Range for mpg:",range(auto$mpg))
+cat("\nRange for displacement:",range(auto$displacement))
+cat("\nRange for weight:",range(auto$weight))
+cat("\nRange for acceleration:", range(auto$acceleration))
+cat("\nRange for year:",range(auto$year))
+cat("\nRange for origin:",range(auto$origin))
+```
+
+```{r}
+cat("mpg Mean: ",mean(auto$mpg),"Std Dev.: ",sqrt(var(auto$mpg)))
+cat("\ndisplacement Mean: ",mean(auto$displacement),"Std Dev.: ",sqrt(var(auto$displacement)))
+cat("\nweight Mean: ",mean(auto$weight),"Std Dev.: ",sqrt(var(auto$weight)))
+cat("\nacceleration Mean: ",mean(auto$acceleration),"Std Dev.: ",sqrt(var(auto$acceleration)))
+cat("\nyear Mean: ",mean(auto$year),"Std Dev.: ",sqrt(var(auto$year)))
+cat("\norigin Mean: ",mean(auto$origin),"Std Dev.: ",sqrt(var(auto$origin)))
+```
+
+```{r}
+auto <- auto[-c(10:85),]
+cat("mpg Mean: ",mean(auto$mpg),"Std Dev.: ",sqrt(var(auto$mpg)))
+cat("\ndisplacement Mean: ",mean(auto$displacement),"Std Dev.: ",sqrt(var(auto$displacement)))
+cat("\nweight Mean: ",mean(auto$weight),"Std Dev.: ",sqrt(var(auto$weight)))
+cat("\nacceleration Mean: ",mean(auto$acceleration),"Std Dev.: ",sqrt(var(auto$acceleration)))
+cat("\nyear Mean: ",mean(auto$year),"Std Dev.: ",sqrt(var(auto$year)))
+cat("\norigin Mean: ",mean(auto$origin),"Std Dev.: ",sqrt(var(auto$origin)))
+```
+
+```{r}
+par(mfrow = c(2,2))
+plot(auto$weight,auto$mpg,col ='red')
+plot(auto$acceleration,auto$mpg,col = 'black')
+plot(auto$displacement,auto$mpg,col = 'green')
+plot(auto$year,auto$mpg,col = 'orange')
+```
+
+```{r}
+boxplot(auto$mpg~auto$cylinders,xlab = "Cylinders",ylab= "mpg")
+```
+
+```{r}
+par(mfrow = c(2,2))
+hist(auto$acceleration,col = 'black')
+hist(auto$mpg,col = 'red')
+hist(auto$weight,col = 'blue')
+hist(auto$displacement,col = 'green')
+```
+
+# Problem 10 #
+
+```{r}
+library(MASS)
+boston <- Boston
+cat("no. of rows:",nrow(Boston))
+cat("\nno. of cols:",ncol(Boston))
+```
+
+```{r}
+par(mfrow = c(2,2))
+plot(boston$crim,boston$medv,col = 'red')
+plot(boston$dis,boston$medv,col = 'yellow')
+plot(boston$tax,boston$medv,col = 'green')
+plot(boston$black,boston$medv)
+```
+
+```{r}
+par(mfrow = c(2,2))
+plot(boston$indus,boston$crim,col = 'red')
+plot(boston$black,boston$crim,col = 'yellow')
+plot(boston$tax,boston$crim,col = 'green')
+plot(boston$medv,boston$crim)
+```
+
+```{r}
+par(mfrow = c(2,2))
+plot(boston$dis,boston$crim,col = 'red')
+plot(boston$dis,boston$tax,col = 'yellow')
+plot(boston$dis,boston$ptratio,col = 'green')
+plot(boston$dis,boston$crim)
+```
+
+```{r}
+boston %>%
+  filter(boston$chas == 1) %>%
+    nrow()
+```
+
+```{r}
+cat("Median pupil-teacher ratio:",median(boston$ptratio))
+```
+
+```{r}
+boston2 <- boston %>%
+  arrange(boston$medv)
+head(boston2, n =10)
+```
+
+```{r}
+boston %>%
+  filter(boston$rm > 7) %>%
+    nrow()
+```
+
+```{r}
+boston %>%
+  filter(boston$rm > 8)
+```
