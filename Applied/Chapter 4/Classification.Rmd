@@ -1,0 +1,475 @@
+---
+title: "Classification"
+author: "Hrishabh Khakurel"
+date: "6/6/2020"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(strip.white = TRUE)
+knitr::opts_chunk$set(warning = FALSE)
+knitr::opts_chunk$set(tidy = TRUE)
+```
+
+```{r, include = FALSE}
+# loading packages
+library(ISLR)
+library(MASS)
+library(class)
+library(ggplot2)
+```
+
+\tableofcontents
+\newpage
+
+# 4.7.10 #
+
+This problem uses the *Weekly* data set from *ISLR* package. It contains 1,089 weekly returns for 21 years, from the begining of 1990 to the end of 2010.
+
+## Dataset ##
+```{r}
+weekly <- Weekly
+kableExtra::kable(head(weekly, n = 10))
+```
+
+## (a) ##
+*Pairs Plot*
+```{r,fig.width=8, fig.height=8}
+GGally::ggpairs(weekly, progress =F)
+```
+
+We can see that most of the variables donot have much relationship, but the Volume and Year variables have a significant relationship.
+
+*Correlation Heat Map*
+
+```{r}
+corr <- cor(weekly[-9])
+ggcorrplot::ggcorrplot(corr, lab =T)
+```
+
+As seen from the pairs plot, the correlation heat map also shows that there is a significant correlation between the Volume and the Year. We will now visualize this relationship.
+
+```{r}
+ggplot(data = weekly, aes (x = Year, y = Volume))+
+  stat_summary(fun.y = mean, geom = 'point') +
+  stat_summary(fun.data = mean_sdl, fun.args = list(mult = 1),geom = 'errorbar')
+```
+
+
+As, we can see the Volume traded is increases with the year.
+
+Some numerical summaries:
+```{r}
+mn <- vector()
+med <-  vector()
+maximum <-  vector()
+minimum <-  vector()
+std_dev <-  vector()
+
+for (i in 2:8){
+  mn[i-1] <- round(mean(weekly[,i]),3)
+  med[i-1] <- round(median(weekly[,i]),3)
+  maximum[i-1] <- round(max(weekly[,i]),3)
+  minimum[i-1] <- round(min(weekly[,i]),3)
+  std_dev[i-1] <- round(sqrt(var(weekly[,i])),3)
+}
+var_names <- colnames(weekly)[-c(1,9)]
+summary_stat <- data.frame(Variables = var_names,Mean = mn, Median = med, 
+                           Maximum = maximum, Minimum = minimum, Std_deviation = std_dev)
+kableExtra::kable(summary_stat)
+```
+
+
+## (b) ##
+In this section, we are going to perform a logistic regression.
+
+```{r}
+glm_fit <- glm(Direction ~ Lag1 + Lag2 + Lag3 + Lag4 + Lag5 + Volume, 
+               data = weekly, family = binomial)
+summary(glm_fit)
+```
+Looking at the above regression summary we can see that only the Lag 2 variable is significant. The others have high p-values.
+
+## (c) ##
+Using the above logistic model we are going to predict the Direction and compute the confusion matrix.
+
+```{r}
+glm_probs <- predict(glm_fit, type = 'response')
+glm_pred <- rep("Up",nrow(weekly))
+glm_pred[glm_probs < 0.5] = 'Down'
+table(glm_pred,weekly$Direction)
+```
+
+```{r}
+Metrics <- c('Sensitivity','Specificity','Precision','Accuracy')
+Values1 <- c(round(((557/(48+557))*100),2),round(((54/(54+430))*100),2),
+             round(((557/(430+557))*100),2),
+             round((((557+54)/nrow(weekly))*100),2))
+kableExtra::kable(data.frame(Metrics,Values= Values1))
+```
+
+As we see the accuracy is not very high, it is only equal to 56.11%, which is slightly better than random guessing. THe precision also arounf the same limit.
+
+
+## (d) ##
+We saw that only Lag2 was significant. So, in this model we will use only Lag2 to predict direction. We are also going to split the data into training and test set.
+
+*Train-Test split*
+```{r}
+test <- weekly$Year > 2008
+test_data <- weekly[test,]
+train_data <- weekly[!test,]
+```
+
+```{r}
+glm_fit2 <- glm(Direction ~ Lag2, data = train_data, family = binomial)
+summary(glm_fit2)
+```
+
+Using the above model to predict results for the test set.
+
+```{r}
+glm_probs2 <- predict(glm_fit2,newdata = test_data)
+glm_pred2 <- rep("Up",nrow(test_data))
+glm_pred2[glm_probs2 < 0.5] = 'Down'
+table(glm_pred2, test_data$Direction)
+```
+
+```{r}
+Values2 <- c(round(((5/(56+5))*100),2),round(((41/(41+2))*100),2),round(((5/(5+2))*100),2),
+             round((((41+5)/nrow(test_data))*100),2))
+kableExtra::kable(data.frame(Metrics,Values= Values2))
+```
+
+In this case the accuracy is lower than random guessing. But the precision is okay. This means that when the model predicts "Up" Direction it is correct 71.43% of the time.
+
+## (e) ##
+In this section we are going to use LDA classifier.
+
+```{r}
+lda_fit <- lda(Direction ~ Lag2, data = train_data)
+lda_fit
+```
+
+From the summary above, we can see that the prior probability for market going down is 44.77% and market going up is 55.22%. We also see that if the market goes up, then there is a tendency for the Lag2 to be positive, wheras if the market goes down then there is a tendency for Lag2 to be negative. The coefficient of linear discriminants is used to calculate the decision rule. If (0.4414 * Lag2) is large, then that observation is calssified as "Up" else it is classified as "Down".
+
+*Visualizing the Classifier*
+```{r}
+group1 <- train_data[train_data$Direction == "Up",]$Lag2
+group2 <-train_data[train_data$Direction == "Down",]$Lag2
+prob1 <- 0.4414162 * group1
+prob2 <- 0.4414162 * group2
+plot1 <- ggplot(data.frame(prob1), aes(prob1)) +
+  geom_histogram(aes(y = ..density..)) +
+  xlab("Group: Up")
+plot2 <- ggplot(data.frame(prob2), aes(prob2)) +
+  geom_histogram(aes(y = ..density..)) +
+  xlab("Group: Down")
+gridExtra::grid.arrange(plot2, plot1, ncol =1)
+```
+
+*Predicting the results*
+```{r}
+pred_lda <- predict(lda_fit,test_data)
+table(pred_lda$class,test_data$Direction)
+```
+
+*Metrics*
+```{r}
+Values3 <- c(round(((56/(56+5))*100),2),round(((9/(34+9))*100),2),round(((56/(56+34))*100),2),
+             round((((56+9)/nrow(test_data))*100),2))
+kableExtra::kable(data.frame(Metrics,Values= Values3))
+```
+
+We have increased the accuracy to 62.50%. But the precision has dropped significantly. The sensitivity of the model is very high.
+
+## (f) ##
+In this section we are going to use QDA classifier.
+
+```{r}
+qda_fit <- qda(Direction ~ Lag2, data = train_data)
+qda_fit
+```
+
+The interpretation of the Prio probabilities and the group means are the same as in answer (e).
+
+*Predicting the results*
+```{r}
+pred_qda <- predict(qda_fit,newdata = data.frame(Lag2 = test_data$Lag2))
+table(pred_qda$class,test_data$Direction)
+```
+
+*Metrics*
+```{r}
+Values4 <- c(round(((61/(61))*100),2),0,round(((61/(61+43))*100),2),
+             round((((61)/nrow(test_data))*100),2))
+kableExtra::kable(data.frame(Metrics,Values= Values4))
+```
+ This model predicts only "Up" direction. Thus it is not a good idea to use this model.
+ 
+ ## (h) ##
+
+First, we need to prepare the inputs.
+```{r}
+train_X <- data.frame(weekly$Lag2[!test])
+test_X <- data.frame(weekly$Lag2[test])
+train_direction <- weekly$Direction[!test]
+```
+
+*Prediction*
+```{r}
+set.seed(1)
+knn_pred <- knn(train_X,test_X, train_direction, k = 1)
+# Confusion Matrix
+table(knn_pred, test_data$Direction)
+```
+
+*Metrics*
+```{r}
+Values5 <- c(round(((31/(61))*100),2),round(((21/(21 + 22))*100),2),round(((31/(31+22))*100),2),
+             round((((31+21)/nrow(test_data))*100),2))
+kableExtra::kable(data.frame(Metrics,Values= Values5))
+```
+
+The accuracy is lower than before and is equal to random guessing. So, this model might not be the best.
+
+
+## (h) ##
+From the above metrics and analysis we can see that the best classifier for this data is LDA.
+
+
+
+
+# 4.7.11 #
+
+In this problem we will be using the *Auto* dataset to predict whether a given car gets high or low gas mileage based on the Auto data set.
+
+*Loading the Dataset*
+```{r}
+auto <- Auto
+kableExtra::kable(head(auto, n = 10))
+```
+
+## (a) ##
+Creating the classifying variable.
+
+```{r}
+mpg01 <- data.frame(rep(1,nrow(auto)))
+mpg01[auto$mpg < median(auto$mpg),] = 0
+auto <- cbind(auto, mpg01)
+col_names <- colnames(auto)
+col_names[10] = 'mpg01'
+colnames(auto) <- col_names
+kableExtra::kable(head(auto, n = 5))
+```
+
+## (b) ##
+*Pairs Plot*
+```{r, fig.width= 8, fig.height=8}
+GGally::ggpairs(auto[-9], progress = F)
+```
+
+
+Except acceleration, year and origin all the other variables have a stron relationship with the mpg01 variable. We will confirm this using the correlation heat map.
+
+*Correlation Heat Map*
+```{r}
+corr2 <- cor(auto[-9])
+ggcorrplot::ggcorrplot(corr2, lab = T)
+```
+
+The correlation plot shows strong relationsips between some of the variables. cylinders, displacement, horsepower and weight have the strongest association.
+
+We will check some boxplots to see how the variables are affecting the mpg01 variable.
+
+```{r}
+bp1 <- ggplot(data = data.frame(auto[-9]), aes(x = mpg01, y = displacement, group = mpg01)) +
+  geom_boxplot()
+bp2 <-  ggplot(data = data.frame(auto[-9]), aes(x = mpg01, y = weight, group = mpg01)) +
+  geom_boxplot()
+bp3 <-  ggplot(data = data.frame(auto[-9]), aes(x = mpg01, y = horsepower, group = mpg01)) +
+  geom_boxplot()
+gridExtra::grid.arrange(bp1,bp2,bp3, ncol = 3)
+```
+So, cars with higher mpg have lower displacement. Similarly, these cars also have lower weight and these cars also have lower horsepower.
+
+## (c) ##
+We are going to split the data into train and test set.
+
+```{r}
+train <- 1:314
+train_set2 <- auto[train,-9]
+test_set2 <- auto[-train,-9]
+```
+
+
+## (d) ##
+```{r}
+lda_fit2 <- lda(mpg01 ~ cylinders + displacement + horsepower + weight, 
+                data = train_set2)
+lda_fit2
+```
+
+The prior probability shows that 60% of the cars have mpg01 = 0 and the rest have mpg01 = 1. The group means show that the cars with mpg01 = 0 have higher no. of cylinders, greater displacement, horsepower and weight.
+
+*Predictions*
+```{r}
+lda_pred <- predict(lda_fit2,test_set2)$class
+table(lda_pred, test_set2$mpg01)
+```
+
+*Metrics*
+```{r}
+Values6 <- c(round(((62/(62 + 11))*100),2),0,round(((62/(62))*100),2),
+             round((((62 + 5)/nrow(test_set2))*100),2))
+kableExtra::kable(data.frame(Metrics,Values= Values6))
+```
+
+This model has fairly high Accuracy. And the error is equal to 14.10%. However, this model doesn't predict mpg = 0 at all. So it may not be beneficial to use this model.
+
+## (e) ##
+```{r}
+qda_fit2 <- qda(mpg01 ~ cylinders + displacement + horsepower + weight, 
+                data = train_set2)
+qda_fit2
+```
+
+The interpretation is the same as before.
+
+*Predictions*
+```{r}
+qda_pred <- predict(qda_fit2,test_set2)$class
+table(qda_pred, test_set2$mpg01)
+```
+
+*Metrics*
+```{r}
+Values7 <- c(round(((62/(62 + 11))*100),2),0,round(((62/(62))*100),2),
+             round((((62 + 5)/nrow(test_set2))*100),2))
+kableExtra::kable(data.frame(Metrics,Values= Values7))
+```
+
+The results are same as before. Hence, this model may not be benificial.
+
+## (f) ##
+We will create a logistic regression classifier.
+
+```{r}
+glm_fit3 <- glm(mpg01 ~ cylinders + displacement + horsepower + weight,
+                data = train_set2, family = binomial )
+summary(glm_fit3)
+```
+
+It seems that cylinders and displacement are not statistically significant.
+
+*Predictions*
+```{r}
+glm_probs3 <- predict(glm_fit3, test_set2)
+glm_pred3 <- rep(1,nrow(test_set2))
+glm_pred3[glm_probs3 < 0.5] = 0
+table(glm_pred3, test_set2$mpg01)
+```
+
+*Metrics*
+```{r}
+Values8 <- c(round(((53/(53 + 20))*100),2),0,round(((53/(53))*100),2),
+             round((((53 + 5)/nrow(test_set2))*100),2))
+kableExtra::kable(data.frame(Metrics,Values= Values8))
+```
+
+The accuracy is lower than before. The test error is 25.64%.
+
+
+## (g) ##
+
+*Preparing the data for knn*
+```{r}
+train_X2 <- cbind(auto$cylinders,auto$displacement,auto$horsepower,auto$weight)[train,]
+test_X2 <- cbind(auto$cylinders,auto$displacement,auto$horsepower,auto$weight)[-train,]
+test_Y2 <- auto$mpg01[train]
+```
+
+*Predictions*
+```{r}
+set.seed(1)
+knn_pred2 <- knn(train_X2, test_X2, test_Y2, k = 3)
+table(knn_pred2,test_set2$mpg01)
+```
+
+
+*Metrics*
+```{r}
+Values9 <- c(round(((54/(54 + 19))*100),2),0,round(((54/(54))*100),2),
+             round((((54 + 5)/nrow(test_set2))*100),2))
+kableExtra::kable(data.frame(Metrics,Values= Values9))
+```
+
+The test error is 24.36% which is higher than for the LDA and QDA.
+
+
+# 4.7.13 #
+We will be using the boston dataset for this exercise.
+
+*Loading the Data*
+```{r}
+boston <- Boston
+# creating a new classifying variable
+crimclass <- data.frame(rep(1,nrow(boston)))
+crimclass[boston$crim < median(boston$crim),] = 0
+boston <- data.frame(boston,crimclass)
+col_names2 <- colnames(boston)
+col_names2[15] = 'crimclass'
+colnames(boston) <- col_names2
+kableExtra::kable(head(boston))
+```
+
+
+## Visualizing the correlation among the variables ##
+```{r, fig.width=8,fig.height=8}
+corr3 <- cor(boston)
+ggcorrplot::ggcorrplot(corr3, lab =TRUE, lab_size = 3)
+```
+
+## Train-Test Split ##
+```{r}
+train2 <- 1:406
+train_boston <- boston[train2,]
+test_boston <- boston[!train2,]
+```
+For this model we will be using logistic regression in the begining.
+
+## Logistic Regression ##
+```{r}
+glm_fit4 <- glm(crimclass ~ . , data = train_boston, family = binomial )
+summary(glm_fit4)
+```
+
+This shows that none of the variables are significant. 
+
+*Predictions*
+```{r}
+glm_probs4 <- predict(glm_fit4, test_boston)
+glm_preds4 <- rep(1,nrow(test_boston))
+glm_preds4[glm_probs4 < 0.5] = 0
+table(glm_preds4, test_boston$crimclass)
+```
+
+This model is not good.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
