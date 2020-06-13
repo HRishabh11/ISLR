@@ -1,0 +1,239 @@
+---
+title: "Resampling Methods"
+author: "Hrishabh Khakurel"
+date: "6/13/2020"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(warning = FALSE)
+knitr::opts_chunk$set(strip.white = TRUE)
+knitr::opts_chunk$set(tidy = TRUE)
+```
+
+```{r, include= FALSE}
+library(ISLR)
+library(ggplot2)
+library(boot)
+```
+
+\tableofcontents
+\newpage
+
+
+# 5.3.1 The Validation Set Approach #
+
+We will use the validation set Approach to estimate the test error rates. We will be using the *Auto* data set. 
+
+## Loading the data set ##
+```{r}
+auto <- Auto
+kableExtra::kable(head(auto, n = 10))
+```
+
+It is a good idea to set the seed for R's random number generator, so that we get consistent results.
+
+```{r}
+set.seed(1)
+```
+
+
+## Creating the Validation Set ##
+We will now use the *sample* function to create a validation set. *sample* function will randomly select the specified no. of observation from the given data set.
+
+```{r}
+train = sample(392,197)
+train
+```
+
+## Creating the model ##
+```{r}
+lm.fit <- lm(mpg ~ horsepower, data = auto, subset =  train)
+summary(lm.fit)
+```
+
+The model is statistically significant.
+
+## Finding the test error rate ##
+```{r}
+# predicting for the whole data
+pred <- predict(lm.fit,auto)
+error <- mean((auto$mpg - pred)[-train]^2)
+paste("The mean squared error is",error)
+```
+
+As we see the mean squared error is 28.79. We will now create a polynomial model and test its error rate.
+
+## Polynomial Regression Model ##
+\textbf{Quadratic Model}
+```{r}
+lm.fit2 <- lm(mpg ~ poly(horsepower,2), data = auto, subset = train)
+pred2 <- predict(lm.fit2, auto)
+error2 <- mean((auto$mpg - pred2)[-train]^2)
+paste("The mean squared error for quadratic model is",error2)
+```
+
+\textbf{Cubic Model}
+```{r}
+lm.fit3 <- lm(mpg ~ poly(horsepower,3), data = auto, subset = train)
+pred3 <- predict(lm.fit3, auto)
+error3 <- mean((auto$mpg - pred3)[-train]^2)
+paste("The mean squared error for cubic model is",error3)
+```
+
+The quadratic model gives better test error.
+
+## Inconsistency of Validation Set approach ##
+The major problem with the Validation set approach is that, for different subsets it gives different errors. We are going to show this fact in this section.
+
+```{r}
+set.seed(2)
+train <- sample(392,196)
+error <- vector()
+for(i in 1:2){
+  temp_fit <- lm(mpg ~ poly(horsepower,i), data = auto, subset = train)
+  error[i] <- mean((auto$mpg - predict(temp_fit, auto))[-train]^2) 
+}
+kableExtra::kable(data.frame(Order = c(1,2), error))
+```
+
+As we can see the error rates are different this time. This is one of the problems with the validation set approach.
+
+\newpage
+# Leave-One-Out Cross-Validation #
+
+
+## A Simple Case ##
+In this section, we will be using the *glm* function for linear regression (instead of the *lm* function). This is because the glm function works together with the *cv.glm* function for cross-validation.
+
+```{r}
+glm.fit <- glm(mpg ~ horsepower, data = Auto)
+cv.err <- cv.glm(auto, glm.fit)
+cv.err$delta
+```
+
+The delta vector contains cross validation results.
+
+## LOOCV for increasing complexity ##
+In this section we perform LOOCV for various degrees of polynomial regression models.
+
+```{r}
+cv.error <- vector()
+for (i in 1:5){
+  glm.fit <- glm(mpg ~ poly(horsepower,i), data = auto)
+  cv.error[i] <- cv.glm(Auto,glm.fit)$delta[1]
+}
+ggplot(data.frame(Order = 1:5, test_error = cv.error), 
+       aes(x = Order, y = test_error)) +
+  geom_line() +
+  ylab("Test Error") +
+  xlab("Polynomial Order")
+```
+
+
+As we see in the plot above, there is sharp drop in test error from order 1 to order 2. But after that there is no clear improvement.
+
+\newpage
+# 5.3.3 k-Fold Cross Validation #
+The *cv.glm* function can also be used to implement k-fold CV. 
+
+```{r}
+set.seed(17)
+cv.error.10 <- vector()
+for (i in 1:10){
+  glm.fit <- glm(mpg ~ poly(horsepower,i), data = auto)
+  cv.error.10[i] <- cv.glm(auto,glm.fit, K = 10)$delta[1]
+}
+ggplot(data.frame(Order = 1:10, test_error = cv.error.10), 
+       aes(x = Order, y = test_error)) +
+  geom_line() +
+  ylab("Test Error") +
+  xlab("Polynomial Order") +
+  scale_x_continuous(limit = c(1,10), breaks = c(1,2,3,4,5,6,7,8,9,10))
+```
+
+As we can see, the test error drops sharply from polynomial order 1 to 2. Then it doesn't change that much. It does however increase at order 10.
+
+\newpage
+# 5.3.4 The Bootstrap #
+
+## Estimating the Accuracy of a Statistics of Interest ##
+
+Performing the bootstrap in R entails two step.\
+*Step 1*: Create a function to compute the statistics of Interest.\
+*Step 2*: Use the *boot* function to perform the bootstrap.\
+
+We will be using the portfolio dataset tin the *ISLR* package.
+
+### *Step 1* Creating the function to compute the statistics of Interest ###
+In this section, we will create a function to compute the statistics of Interest.
+
+```{r}
+alpha.fn <- function(data,index){
+  X <- data$X[index]
+  Y <- data$Y[index]
+  return((var(Y)-cov(X,Y))/(var(X) + var(Y) - 2*cov(X,Y)))
+}
+```
+
+### *Step 2* Performing the bootstrap ###
+In this section we will use the *boot* function from the *boot* package to pergorm the bootstrap.
+
+```{r}
+portfolio <- Portfolio
+boot(portfolio, alpha.fn, R = 1000)
+```
+
+The final output for out alpha using the portfolia data is 0.5758. And the bootstrap SE is 0.089.
+
+## Estimating the Accuracy of a Linear Regression Model ##
+The bootstrap approach can be used to assess the variability of the coefficient estimates and prediction from a statistical learning algorithm. In this section, we will use bootstrap to assess the variablility of the estimates for ${\beta_{0}}$ and ${\beta_{1}}$. 
+
+### Creating the function ###
+In this section, we will create the function to calculate the required statisitcs.
+
+```{r}
+boot.fn <- function(data,index){
+  return(coef(lm(mpg ~ horsepower, data = data, subset = index)))
+}
+```
+
+### The bootstrap ###
+Now, we will run the bootstrap.
+
+```{r}
+set.seed(1)
+boot(auto,boot.fn, R = 1000)
+```
+
+
+As we see the bootstrap SE for ${\beta_{0}}$ is 0.844 and for ${\beta_{1}}$ is 0.0074. Let us compare the bootstrap results with the general result.
+
+```{r}
+summary(lm(mpg ~ horsepower, data = auto))$coef
+```
+
+
+We can see that the SE obtained from the bootstrap is not the same as the SE obtained from the *summary* function. In reality, the SE from the bootstrap is a better estimate because of the fact the this is free from assumptions. The *summary* function calculates the SE based on ${\sigma^{2}}$ which is unknown. This statistics is estimated using the RSS. The ${\sigma^{2}}$ depends on the linear model being correct. Due to these assumptions the SE reported by bootstrap is better than the SE reported by the summary function.
+
+### Bootstrap for quadratic model ###
+We saw that the quadratic model was better than the linear model. In this section we will conduct bootstrap in the quadratic model.
+
+```{r}
+boot.fn2 <- function(data,index){
+  return(coef(lm(mpg ~ horsepower + I(horsepower^2),
+                 data = auto,
+                 subset = index)))
+}
+boot(auto,boot.fn2,R = 1000)
+```
+
+Now, comparing this with the standard result.
+
+```{r}
+summary(lm(mpg ~ horsepower + I(horsepower ^2 ), data = auto))$coef
+```
+
+We obtain similar conclusion as before.
+
