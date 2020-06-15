@@ -1,0 +1,362 @@
+---
+title: "Resampling Methods"
+author: "Hrishabh Khakurel"
+date: "6/14/2020"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(tidy = TRUE)
+knitr::opts_chunk$set(strip.white = TRUE)
+knitr::opts_chunk$set(warning = FALSE)
+```
+
+```{r}
+library(ISLR)
+library(boot)
+library(ggplot2)
+```
+
+
+\tableofcontents
+\newpage
+
+# 5.4.5 #
+In this problem we will be using the *Default* dataset and estimate the test error of the logistic regression model using the **Validation Set Approach**.
+
+**Loading the dataset**
+```{r}
+default <- Default
+# set seed for consistent result
+set.seed(1)
+```
+
+## (a) ##
+We will create a logistic regression model in this section.
+
+```{r}
+glm.fit <- glm(default ~ income + balance, data = default, family = binomial)
+summary(glm.fit)
+```
+
+## (b) ##
+In this section we will use the validation set approach.
+
+### i. ###
+First, we will split the dataset into training set and validation set.
+```{r}
+train <- sample(10000,5000)
+```
+
+### ii. ###
+We will use the training set to train the model.
+```{r}
+glm.fit2 <- glm(default ~ income + balance, data = default, subset = train, family = binomial)
+summary(glm.fit)
+```
+
+### iii. ###
+In this step, we will predict the outcome for validation set.
+```{r}
+pred_prob <- predict(glm.fit2, newdata = default[-train,])
+pred <- rep('No',5000)
+pred[pred_prob > 0.5] = 'Yes'
+```
+
+
+### iv. ###
+In this set we will calculate the validation set error.
+
+```{r}
+t <- as.matrix(table(pred, default[-train,]$default))
+error <- round((1 - (t[1,1] + t[2,2])/5000)*100,2)
+paste0('The validation set error is ',error, '%')
+```
+
+Thus, we obtain a validation set error of 2.64%.
+
+## (d) ##
+We will now show the inconsistency of the validation set method by doing the process three times.
+
+```{r}
+error_list <- vector()
+for(i in 1:3){
+  set.seed(i)
+  train <- sample(10000,5000)
+  glm.fit3 <- glm(default ~ income + balance, data = default, subset = train, family = binomial)
+  pred_probs3 <- predict(glm.fit3, default[-train,])
+  pred3 <- rep('No',5000)
+  pred3[pred_probs3 > 0.5] <- 'Yes'
+  mat <- table(pred3, default[-train,]$default)
+  error[i] <- round((1 - (mat[1,1] + mat[2,2])/5000)*100,2)
+}
+
+kableExtra::kable(data.frame(Sampling = c(1,2,3), error))
+```
+As we see, we get three different validation errors for three different samples taken.
+
+
+## (d) ##
+In this section we will add a new independent variable student to our model.
+
+```{r}
+set.seed(1)
+train <- sample(10000,5000)
+glm.fit4 <- glm(default ~ income + balance + student, data = default, subset = train, family = binomial)
+pred_probs4 <- predict(glm.fit4, default[-train,])
+pred4 <- rep('No',5000)
+pred4[pred_probs4 > 0.5] <- 'Yes'
+mat <- table(pred4, default[-train,]$default)
+error4 <- round((1 - (mat[1,1] + mat[2,2])/5000)*100,2)
+paste0('The validation set error is ',error4, '%')
+```
+Yes the error goes down when we include the student variable.
+
+\newpage
+# 5.4.6 #
+We will be using the same default dataset in this exercise. We will be computing the estimates for the standard errors in the following two ways:\
+1. Using the bootstrap.\
+2. Using the standard formula.\
+
+## (a) ##
+```{r}
+set.seed(1)
+summary(glm(default ~ income + balance, data = default, family = binomial))$coef
+```
+
+The above output is associated with the calculation of estimate and their standard errors using the standard formula.
+
+## (b) ##
+In this section we will construct the function to calculate the statistics needed for bootstrap.
+
+```{r}
+boot.fn <- function(data,index){
+  return(coef(glm(default ~ income + balance, data = data, subset = index, family = binomial)))
+}
+```
+
+
+## (c) ##
+In this section we will perform the bootstrap using the function defined in the above section.
+
+```{r}
+boot(default, boot.fn, R = 1000)
+```
+
+## (d) ##
+As we can see, both the standard function and the bootstrap method gives the same coefficient estimates but differ in the std. error. As discussed in the book, the SE from the standard function is not accurate as the formula used to calculate the SE depends on underlying assumptions of linearity in the data. This may not be satisfied. Hence, the SE obtained from the bootstrap is a better estimate.
+
+\newpage
+# 5.4.7 #
+In this section, we will perform LOOCV without using the *cv.glm* function. This can be accomplished by using loops. We will work with the *Weekly* dataset.
+
+**Loading the Data**
+```{r}
+weekly <- Weekly
+kableExtra::kable(head(weekly,10))
+```
+
+## (a) ##
+We will fit a logistic model using Lag1 and Lag2 to predict the direction.
+
+```{r}
+glm.fit5 <- glm(Direction ~ Lag1 + Lag2, data = weekly, family = binomial)
+summary(glm.fit5)
+```
+
+We can see that the dependent variable are not very statistically significant.
+
+## (b) ##
+In this section we will fit the logistic regression model using all but the first observation.
+```{r}
+temp_data <- weekly[-1,]
+glm.fit4 <- glm(Direction ~ Lag1 + Lag2, data = temp_data, family = binomial)
+summary(glm.fit4)
+```
+
+## (c) ##
+In this section we will predict the result for the first observation.
+```{r}
+if (predict(glm.fit4,weekly[1,]) > 0.5){
+  print('The Direction is predicted to be Up.')
+} else {
+  print('The Direction is predicted to be Down.')
+}
+paste0('The true outcome is ', weekly[1,]$Direction, '.' )
+```
+
+Thus, the prediction was correct.
+
+## (d) ##
+In this section we will create a loop to perform LOOCV.
+```{r}
+count <- rep(0,1089)
+for (i in 1:1089){
+  temp_data2 <- weekly[-i,]
+  temp.fit <- glm(Direction ~ Lag1 + Lag2, data = temp_data2, family = binomial)
+  if(predict(temp.fit, weekly[i,]) > 0.5){
+    temp.pred <- 'Up'
+  } else {
+    temp.pred <- 'Down'
+  }
+  if (temp.pred != weekly[i,]$Direction){
+    count[i] <- 1
+  }
+}
+```
+
+
+## (e) ##
+In this section, we will find the error rate.
+```{r}
+paste0('The LOOCV error is ',round((sum(count)/nrow(weekly))*100,2), '%')
+```
+
+The error is very high. So the model is not accurate.
+
+# 5.4.8 #
+In this section we will perform cross-validation on a simulated dataset.
+
+## (a) ##
+We will first simulate some data.
+```{r}
+set.seed(1)
+x <- rnorm(100)
+y <- x - 2*x^2 + rnorm(100)
+```
+Here, n is 100 and p is 2.
+
+## (b) ##
+*Visual representation of the data*
+```{r}
+ggplot(data.frame(x,y), aes(x,y)) +
+  geom_point()
+```
+
+This model is quadratic.
+
+## (c) ##
+In this section, we will compute the four given models nad their LOOCV statistics. We will automate this process using loops.
+
+```{r}
+data <- data.frame(x,y)
+set.seed(5)
+loocv_error <- vector()
+for(i in 1:4){
+  glm.fit <- glm(y ~ poly(x,i), data = data)
+  loocv_error[i] <- cv.glm(data, glm.fit)$delta[1]
+}
+ggplot(data.frame(Degree = c(1,2,3,4), Error = loocv_error), aes(x = Degree, y = Error))+
+  geom_line()
+```
+As we see, the loocv error drops sharply when the degree increases from 1 to 2. After that the error remains constant. This is because, the data had a quadratic relationship. Once that is attained, their cannot be further improvement in the error.
+
+## (d) ##
+```{r}
+set.seed(100)
+loocv_error2 <- vector()
+for(i in 1:4){
+  glm.fit <- glm(y ~ poly(x,i), data = data)
+  loocv_error2[i] <- cv.glm(data, glm.fit)$delta[1]
+}
+ggplot(data.frame(Degree = c(1,2,3,4), Error = loocv_error2), aes(x = Degree, y = Error))+
+  geom_line()
+```
+We obtain the same results as before. This is because there is no randomness in the training/validation set split in the LOOCV method. 
+
+## (e) ##
+As we see, the loocv error drops sharply when the degree increases from 1 to 2. After that the error remains constant. This is because, the data had a quadratic relationship. Once that is attained, their cannot be further improvement in the error. Thus, the best model is the quadratic model.
+
+## (f) ##
+In this section we will look at the statistical significance of the coefficient described in each model.
+```{r}
+for (i in 1:4){
+  glm.fit <- glm(y ~ poly(x,i), data = data)
+  print(summary(glm.fit))
+}
+```
+
+As we can see, only the coefficients of intercept, x and ${x^{2}}$ is statistically significant. This result is the same as the result we obtained from crossvalidation.
+
+\newpage
+# 5.4.9 #
+In this section we will be using the *Boston* dataset from the *MASS* package.
+
+**Loading the Dataset**
+```{r}
+boston <- MASS::Boston
+kableExtra::kable(head(boston, 10))
+```
+
+## (a) ##
+```{r}
+paste0('The estimate for the population mean is ', round(mean(boston$medv),2))
+```
+
+## (b) ##
+```{r}
+paste0('The estimate for the standard error is ', round(sqrt(var(boston$medv)/nrow(boston)),3))
+```
+
+
+## (c) ##
+We will use the bootstrap function to calculate the standard error.\
+
+### Step 1: Creating the function to compute the statistics ###
+```{r}
+boot.fn2 <- function(data,index)
+  return(sd(data[index])/sqrt(length(data[index])))
+```
+
+### Step 2: Perform the Bootstrap ###
+```{r}
+t <- boot(boston$medv, boot.fn2, R = 1000)
+t
+```
+
+The estimated std. error is same as the previously calculated std. error.
+
+## (d) ##
+```{r}
+CI <- c(mean(boston$medv) - 2 * t$t0,mean(boston$medv) + 2 * t$t0)
+paste0('The 95% Confidence Interval obtained from bootstrap is: ')
+CI
+```
+
+```{r}
+t.test(boston$medv)
+```
+
+As we can see, our results are similar to the ones obtained using t-test.
+
+## (e) ##
+```{r}
+paste0('The estimate for median of medv is ',median(boston$medv))
+```
+
+## (f) ##
+We are using bootstrap to calculate the the standard error of the median estimator.
+```{r}
+boot.fn3 <- function(data,index){
+  return(median(data[index]))
+}
+boot(boston$medv,boot.fn3, R = 1000)
+```
+
+The standard error for the median is 0.3839.
+
+## (g) ##
+```{r}
+paste0('The tenth percentile of medv is ', quantile(boston$medv,0.1))
+```
+
+## (h) ##
+```{r}
+boot.fn4 <- function(data,index){
+  return(quantile(data[index],0.1))
+}
+boot(boston$medv,boot.fn4, R = 1000)
+```
+
+The standard error for the 10 percentile is 0.4869.
